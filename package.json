@@ -1,0 +1,47 @@
+{
+  "name": "hermes-telegram-grammy",
+  "version": "0.1.0",
+  "description": "A grammY-based Telegram sidecar gateway for Hermes Agent with native chat buttons and command palette.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "hermes-telegram-grammy": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    ".env.example"
+  ],
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "ci": "npm run typecheck && npm run build && npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aresstokrat/hermes-telegram-grammy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aresstokrat/hermes-telegram-grammy/issues"
+  },
+  "homepage": "https://github.com/aresstokrat/hermes-telegram-grammy#readme",
+  "keywords": ["hermes-agent", "telegram", "grammy", "bot", "sidecar", "ai-agent"],
+  "author": "aresstokrat",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "grammy": "^1.34.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18.19"
+  }
+}

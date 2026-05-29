@@ -1,0 +1,13 @@
+services:
+  hermes-telegram-grammy:
+    build: .
+    restart: unless-stopped
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      HERMES_API_BASE_URL: ${HERMES_API_BASE_URL:-http://host.docker.internal:8642}
+      HERMES_API_KEY: ${HERMES_API_KEY}
+      TELEGRAM_ALLOWED_USERS: ${TELEGRAM_ALLOWED_USERS}
+      HERMES_CONVERSATION_PREFIX: ${HERMES_CONVERSATION_PREFIX:-telegram}
+      HERMES_REQUEST_TIMEOUT_MS: ${HERMES_REQUEST_TIMEOUT_MS:-180000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
