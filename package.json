@@ -1,6 +1,6 @@
 {
   "name": "hermes-telegram-grammy",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "A grammY-based Telegram sidecar gateway for Hermes Agent with native chat buttons and command palette.",
   "type": "module",
   "main": "dist/index.js",
