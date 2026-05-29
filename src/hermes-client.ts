@@ -24,8 +24,21 @@ export type HermesClientOptions = {
   fetchImpl?: typeof fetch;
 };
 
+export type HermesTextPart = { type: "text"; text: string };
+export type HermesImagePart = {
+  type: "image_url" | "input_image";
+  image_url: string | { url: string; detail?: string };
+  detail?: string;
+};
+export type HermesContentPart = HermesTextPart | HermesImagePart;
+export type HermesMessageInput = {
+  role?: "user" | "assistant" | "system" | string;
+  content: string | HermesContentPart[];
+};
+export type HermesResponsesInput = string | Array<string | HermesMessageInput>;
+
 export type SendMessageInput = {
-  input: string;
+  input: HermesResponsesInput;
   conversation: string;
   instructions?: string;
 };
@@ -326,7 +339,19 @@ export function extractResponseText(raw: unknown): string {
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
-function summarizeTask(input: string): string {
+function summarizeTask(input: HermesResponsesInput): string {
+  if (Array.isArray(input)) {
+    const last = input[input.length - 1];
+    if (typeof last === "string") return summarizeTask(last);
+    const content = last?.content;
+    if (typeof content === "string") return summarizeTask(content);
+    if (Array.isArray(content)) {
+      const textPart = content.find((part) => part.type === "text" && part.text.trim());
+      if (textPart?.type === "text") return summarizeTask(textPart.text);
+      if (content.some((part) => part.type === "image_url" || part.type === "input_image")) return "[image]";
+    }
+    return "[message]";
+  }
   // For slash commands, use the command itself
   if (input.startsWith("/")) {
     const spaceIdx = input.indexOf(" ");

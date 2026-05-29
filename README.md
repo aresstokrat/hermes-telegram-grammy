@@ -23,6 +23,7 @@ Telegram chat → grammY sidecar → Hermes API Server → Hermes Agent
 - Telegram allowlist via `TELEGRAM_ALLOWED_USERS`
 - Message splitting for Telegram limits
 - OpenAI Responses API client for Hermes
+- Screenshot/photo forwarding with captions for UI-reference analysis
 
 ## Hermes setup
 
@@ -43,7 +44,7 @@ API_SERVER_KEY=change-me-local-dev
 
 ## Sidecar setup
 
-Requires Node.js `>=18.19`.
+Requires Node.js `>=20`.
 
 ```bash
 cp .env.example .env
@@ -75,12 +76,14 @@ Help:    Debug, Commands, Help
 
 Buttons route to the same command handlers as slash commands, so the UI stays thin and Hermes remains the backend.
 
+You can also send screenshots/photos with an optional caption. The sidecar downloads the Telegram image, forwards it to Hermes as multimodal `text + image_url` input, and asks Hermes to return a concise UX map for grammY-native implementation.
+
 ## Current limitations
 
 - Normal chat uses Hermes `/v1/responses` named conversations.
 - `/model`, `/cron`, `/platforms`, and `/debug` are forwarded to Hermes as slash-command text.
 - `/stop` is a placeholder until Runs API stop support is wired in.
-- Media/voice/document forwarding and approval callbacks are not implemented yet.
+- Voice and screenshot/photo forwarding are implemented. Generic documents and approval callbacks are not implemented yet.
 - Do not run this sidecar and the native Hermes Telegram adapter against the same bot token at the same time.
 
 ## Docker

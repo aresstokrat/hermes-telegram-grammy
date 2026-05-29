@@ -14,7 +14,7 @@ import { ConversationFlavor } from "@grammyjs/conversations";
 import { isAllowedUser } from "./auth.js";
 import { AppConfig } from "./config.js";
 import { escapeTelegramHtml, splitTelegramMessage } from "./format.js";
-import { HermesClient, formatHeartbeat, type HeartbeatInfo, type TextChunk } from "./hermes-client.js";
+import { HermesClient, formatHeartbeat, type HeartbeatInfo, type HermesResponsesInput, type TextChunk } from "./hermes-client.js";
 import {
   BOT_COMMANDS,
   buildKeyboard,
@@ -23,6 +23,7 @@ import {
   parseCallbackData,
 } from "./menus.js";
 import { SessionStore } from "./sessions.js";
+import { buildPhotoPrompt, downloadTelegramFileAsDataUrl, selectLargestPhoto } from "./telegram-media.js";
 import { handleVoiceMessage } from "./voice-handler.js";
 
 // ─── Runtime dependency injection ──────────────────────────────────
@@ -172,6 +173,40 @@ export function createBot(config: AppConfig, runtime: Runtime): Bot<MyContext> {
     }
   });
 
+  // ─── Photo / UI reference handler ───────────────────────────────
+  bot.on("message:photo", async (ctx) => {
+    const selectedPhoto = selectLargestPhoto(ctx.message.photo);
+    if (!selectedPhoto) {
+      await ctx.reply("⚠ Не вижу изображение в сообщении.");
+      return;
+    }
+
+    try {
+      await ctx.replyWithChatAction("typing").catch(() => undefined);
+      await ctx.reply("🖼 Скрин получил, разбираю интерфейс…");
+
+      const imageUrl = await downloadTelegramFileAsDataUrl({
+        botToken: config.telegramBotToken,
+        fileId: selectedPhoto.file_id,
+        api: ctx.api,
+      });
+      const prompt = buildPhotoPrompt(ctx.message.caption);
+
+      await sendTyping(ctx, () => forwardMessage(ctx, runtime, [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: imageUrl, detail: "high" } },
+          ],
+        },
+      ]));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await ctx.reply(`⚠ Ошибка обработки скриншота: ${escapeTelegramHtml(message.slice(0, 400))}`, { parse_mode: "HTML" }).catch(() => undefined);
+    }
+  });
+
   // ─── Fallback text handler ────────────────────────────────────
 
   bot.on("message:text", async (ctx) => {
@@ -268,7 +303,7 @@ async function forwardCommand(ctx: MyContext, runtime: Runtime, command: string)
   await sendTyping(ctx, () => forwardMessage(ctx, runtime, command));
 }
 
-async function forwardMessage(ctx: MyContext, runtime: Runtime, input: string): Promise<void> {
+async function forwardMessage(ctx: MyContext, runtime: Runtime, input: HermesResponsesInput): Promise<void> {
   const conversation = runtime.sessions.conversationFor(sessionKey(ctx));
   const chatId = ctx.chat?.id;
 
