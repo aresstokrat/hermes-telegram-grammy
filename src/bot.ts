@@ -14,6 +14,11 @@ export type Runtime = {
 export function createBot(config: AppConfig, runtime: Runtime): Bot<Context> {
   const bot = new Bot<Context>(config.telegramBotToken);
 
+  bot.catch(async (err) => {
+    const e = err.error ?? err;
+    console.error("grammY handler error:", e instanceof Error ? e.message : String(e));
+  });
+
   bot.use(async (ctx, next) => {
     const userId = ctx.from?.id;
     if (!isAllowedUser(userId, config.allowedUsers)) {
@@ -118,10 +123,15 @@ async function forwardSlashCommand(ctx: Context, runtime: Runtime, command: stri
 
 async function forwardMessage(ctx: Context, runtime: Runtime, input: string): Promise<void> {
   const conversation = runtime.sessions.conversationFor(sessionKey(ctx));
-  const result = await runtime.hermes.sendMessage({ input, conversation });
-  const text = result.text || "Hermes returned an empty response.";
-  for (const chunk of splitTelegramMessage(text)) {
-    await ctx.reply(chunk);
+  try {
+    const result = await runtime.hermes.sendMessage({ input, conversation });
+    const text = result.text || "Hermes returned an empty response.";
+    for (const chunk of splitTelegramMessage(text)) {
+      await ctx.reply(chunk);
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await ctx.reply(`⚠ Hermes API error: ${escapeTelegramHtml(message.slice(0, 500))}`, { parse_mode: "HTML" }).catch(() => undefined);
   }
 }
 
