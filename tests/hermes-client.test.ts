@@ -55,6 +55,33 @@ describe("HermesClient", () => {
     assert.equal(body.store, true);
   });
 
+  it("sends multimodal image input through the streaming API", async () => {
+    const { fetchMock, calls } = createSSEFetch([
+      { event: "response.completed", data: { type: "response.completed", response: { id: "resp_img", status: "completed", output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: "UI map" }] }] } } },
+    ]);
+
+    const client = new HermesClient({ baseUrl: "http://hermes.local", apiKey: "secret", fetchImpl: fetchMock });
+    const result = await client.sendMessage({
+      input: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Analyze this UI screenshot" },
+            { type: "image_url", image_url: { url: "data:image/png;base64,AAAA", detail: "high" } },
+          ],
+        },
+      ],
+      conversation: "telegram:photo",
+    });
+
+    assert.equal(result.text, "UI map");
+    const body = JSON.parse(String(calls[0][1].body));
+    assert.deepEqual(body.input[0].content[1], {
+      type: "image_url",
+      image_url: { url: "data:image/png;base64,AAAA", detail: "high" },
+    });
+  });
+
   it("reads health status", async () => {
     const calls: Array<[string, RequestInit]> = [];
     const fetchMock = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
