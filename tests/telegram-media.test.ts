@@ -48,4 +48,53 @@ describe("telegram photo helpers", () => {
     assert.equal(fetchCalls[0], "https://api.telegram.org/file/bot123:secret-token/photos/file_1.jpg");
     assert.equal(dataUrl, "data:image/jpeg;base64,AQID");
   });
+
+  it("treats Telegram application/octet-stream downloads as images when file path has an image extension", async () => {
+    const dataUrl = await downloadTelegramFileAsDataUrl({
+      botToken: "123:secret-token",
+      fileId: "photo_file_id",
+      api: {
+        getFile: async () => ({ file_path: "photos/file_2.jpg" }),
+      },
+      fetchImpl: async () => new Response(new Uint8Array([4, 5, 6]), {
+        status: 200,
+        headers: { "content-type": "application/octet-stream" },
+      }),
+    });
+
+    assert.equal(dataUrl, "data:image/jpeg;base64,BAUG");
+  });
+
+  it("treats Telegram application/octet-stream downloads as images when bytes have an image signature", async () => {
+    const dataUrl = await downloadTelegramFileAsDataUrl({
+      botToken: "123:secret-token",
+      fileId: "photo_file_id",
+      api: {
+        getFile: async () => ({ file_path: "photos/file_without_extension" }),
+      },
+      fetchImpl: async () => new Response(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), {
+        status: 200,
+        headers: { "content-type": "application/octet-stream" },
+      }),
+    });
+
+    assert.equal(dataUrl, "data:image/jpeg;base64,/9j/4A==");
+  });
+
+  it("rejects non-image content types even when the file path looks like an image", async () => {
+    await assert.rejects(
+      () => downloadTelegramFileAsDataUrl({
+        botToken: "123:secret-token",
+        fileId: "photo_file_id",
+        api: {
+          getFile: async () => ({ file_path: "photos/file_3.jpg" }),
+        },
+        fetchImpl: async () => new Response("not an image", {
+          status: 200,
+          headers: { "content-type": "text/plain" },
+        }),
+      }),
+      /Telegram file is not an image: text\/plain/,
+    );
+  });
 });

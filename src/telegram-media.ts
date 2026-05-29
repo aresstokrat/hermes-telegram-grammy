@@ -59,23 +59,59 @@ export async function downloadTelegramFileAsDataUrl(options: DownloadTelegramFil
     throw new Error(`Telegram file download failed: ${response.status}${text ? ` ${text.slice(0, 200)}` : ""}`);
   }
 
-  const contentType = response.headers.get("content-type") || guessImageMimeType(file.file_path);
-  if (!contentType.toLowerCase().startsWith("image/")) {
-    throw new Error(`Telegram file is not an image: ${contentType}`);
+  const contentType = normalizeMimeType(response.headers.get("content-type"));
+  const bytes = Buffer.from(await response.arrayBuffer());
+  const realContentType = resolveImageMimeType({
+    headerContentType: contentType,
+    filePath: file.file_path,
+    bytes,
+  });
+  if (!realContentType) {
+    throw new Error(`Telegram file is not an image: ${contentType || "unknown"}`);
   }
 
-  const bytes = Buffer.from(await response.arrayBuffer());
-  return `data:${contentType};base64,${bytes.toString("base64")}`;
+  return `data:${realContentType};base64,${bytes.toString("base64")}`;
 }
 
 function photoScore(photo: TelegramPhotoSize): number {
   return photo.width * photo.height + (photo.file_size ?? 0) / 1000;
 }
 
-function guessImageMimeType(path: string): string {
+function resolveImageMimeType(options: {
+  headerContentType?: string;
+  filePath: string;
+  bytes: Buffer;
+}): string | undefined {
+  if (options.headerContentType?.startsWith("image/")) return options.headerContentType;
+  if (options.headerContentType && !isAmbiguousBinaryMimeType(options.headerContentType)) return undefined;
+  return guessImageMimeType(options.filePath) ?? sniffImageMimeType(options.bytes);
+}
+
+function normalizeMimeType(contentType: string | null): string | undefined {
+  const normalized = contentType?.split(";", 1)[0]?.trim().toLowerCase();
+  return normalized || undefined;
+}
+
+function isAmbiguousBinaryMimeType(contentType: string): boolean {
+  return contentType === "application/octet-stream" || contentType === "binary/octet-stream";
+}
+
+function guessImageMimeType(path: string): string | undefined {
   const lowered = path.toLowerCase();
+  if (lowered.endsWith(".jpg") || lowered.endsWith(".jpeg")) return "image/jpeg";
   if (lowered.endsWith(".png")) return "image/png";
   if (lowered.endsWith(".webp")) return "image/webp";
   if (lowered.endsWith(".gif")) return "image/gif";
-  return "image/jpeg";
+  return undefined;
+}
+
+function sniffImageMimeType(bytes: Buffer): string | undefined {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+  if (bytes.length >= 6) {
+    const gifHeader = bytes.subarray(0, 6).toString("ascii");
+    if (gifHeader === "GIF87a" || gifHeader === "GIF89a") return "image/gif";
+  }
+  if (bytes.length >= 12 && bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP") return "image/webp";
+  return undefined;
 }
